@@ -283,11 +283,11 @@ if __name__ == "__main__":
         sys.exit(1)
 ###
 
-#四、qbittorrent内勾选并填入新增 Torrent 时运行脚本
+#五、qbittorrent内勾选并填入新增 Torrent 时运行脚本
 
 /opt/venv/bin/python3 /scripts/qbit_classifier.py "%I" "%N" "%F" "%L"
 
-#五、测试
+#六、测试
 
 #1、进入容器内终端
 
@@ -330,4 +330,4 @@ sudo docker exec -it qbittorrent /bin/sh
 
 ===== 种子保存路径和分类标签设置成功 =====
 
-#六、上传真实种子，到web界面查看是否成功。
+#上传真实种子，到web界面查看是否成功。
