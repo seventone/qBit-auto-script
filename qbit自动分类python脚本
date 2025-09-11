@@ -1,0 +1,333 @@
+
+#一、创建*/Python/Dockerfile并修改权限
+#例如：/vol1/1000/Docker/python/Dockerfile
+
+#Dockerfile文件内容
+###
+FROM linuxserver/qbittorrent:latest
+
+# 1. 安装Python3、pip3（系统级）
+RUN apk update && \
+    apk add --no-cache python3 py3-pip && \
+    # 2. 创建虚拟环境（路径：/opt/venv，容器内固定路径）
+    python3 -m venv /opt/venv && \
+    # 3. 在虚拟环境中安装requests（用虚拟环境的pip）
+    /opt/venv/bin/pip install --no-cache-dir requests && \
+    # 4. 清理缓存
+    rm -rf /var/cache/apk/*
+
+# 5. 设置环境变量，让系统优先使用虚拟环境的Python（可选，方便手动调用）
+ENV PATH="/opt/venv/bin:$PATH"
+###
+
+#二、修改容器compose文件（qbittorrent范例）
+
+###
+services:
+  qbittorrent:
+    # 核心修改：指定 Dockerfile 所在目录和文件名
+    build:
+      context: /vol1/1000/Docker/python   # Dockerfile 所在的目录（你的 Python 目录）
+      dockerfile: Dockerfile              # 文件名（就是你创建的 Dockerfile）
+    image: linuxserver/qbittorrent:latest  # 镜像名保持不变，方便识别
+    container_name: qbittorrent
+    environment:
+      - PUID=0  
+      - PGID=0
+      - TZ=Asia/Shanghai
+      - WEBUI_PORT=8081
+      - TORRENTING_PORT=26882
+    volumes:
+      - ****/config:/config    # qB 配置目录（不变）
+      - ****/DL:/DL                        # 下载目录（不变）
+      - ****/scripts:/scripts  # 映射分类脚本目录到容器内 /scripts（宿主机脚本放在 **** 目录下）
+    ports:
+      - 8081:8080
+      - 26882:26882
+      - 26882:26882/udp
+    restart: unless-stopped
+    network_mode: "host"
+###
+
+#三、SSH终端，cd到compose后sudo docker compose up -d --build
+
+###类似下文
+admin@FNNAS:/vol1/1000/Docker/qbittorrent$ sudo docker compose up -d --build
+Compose can now delegate builds to bake for better performance.
+ To do so, set COMPOSE_BAKE=true.
+[+] Building 87.4s (7/7) FINISHED                                                                                                                                 docker:default
+ => [qbittorrent internal] load build definition from Dockerfile                                                                                                            0.0s
+ => => transferring dockerfile: 681B                                                                                                                                        0.0s
+ => [qbittorrent internal] load metadata for docker.io/linuxserver/qbittorrent:latest                                                                                       0.0s
+ => [qbittorrent internal] load .dockerignore                                                                                                                               0.0s
+ => => transferring context: 2B                                                                                                                                             0.0s
+ => CACHED [qbittorrent 1/2] FROM docker.io/linuxserver/qbittorrent:latest                                                                                                  0.0s
+ => [qbittorrent 2/2] RUN apk update &&     apk add --no-cache python3 py3-pip &&     python3 -m venv /opt/venv &&     /opt/venv/bin/pip install --no-cache-dir requests   86.8s
+ => [qbittorrent] exporting to image                                                                                                                                        0.4s 
+ => => exporting layers                                                                                                                                                     0.4s 
+ => => writing image sha256:a8c15c4b0932447b73e3f765e5a77522bb8fbfb83784793efaa88a7c622e046d                                                                                0.0s 
+ => => naming to docker.io/linuxserver/qbittorrent:latest                                                                                                                   0.0s 
+ => [qbittorrent] resolving provenance for metadata file                                                                                                                    0.0s 
+[+] Running 2/2                                                                                                                                                                  
+ ! qbittorrent Published ports are discarded when using host network mode                                                                                                   0.1s 
+ ✔ Container qbittorrent   
+###
+
+#四、创建脚本qbit_classifier.py(注意权限),路径/vol1/1000/Docker/qbittorrent/scripts/qbit_classifier.py
+
+###
+#!/opt/venv/bin/python3  # 指向虚拟环境的Python
+import re
+import sys
+import requests
+import os
+
+# ==================== 配置参数 ====================
+QB_HOST = "10.0.0.10"
+QB_PORT = 8081
+QB_USER = "admin"
+QB_PASS = "9763899"
+
+BASE_DIR = "/媒体库库/下载"
+MOVIES_DIR = f"{BASE_DIR}/电影"
+TV_DIR = f"{BASE_DIR}/电视剧"
+OTHER_DIR = f"{BASE_DIR}/其他"
+
+# 分类标签名称（与WebUI中显示的一致）
+CATEGORY_MOVIE = "电影"
+CATEGORY_TV = "电视剧"
+CATEGORY_OTHER = "其他"
+
+# 创建目录并检查权限
+for dir_path in [MOVIES_DIR, TV_DIR, OTHER_DIR]:
+    os.makedirs(dir_path, exist_ok=True)
+    print(f"确保目录存在: {dir_path} (权限: {oct(os.stat(dir_path).st_mode)[-3:]})")
+
+# ==================== 辅助函数 ====================
+def login_qbittorrent():
+    """登录并获取认证Cookie"""
+    url = f"http://{QB_HOST}:{QB_PORT}/api/v2/auth/login"
+    headers = {
+        "User-Agent": "qbit-classifier/1.0",
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    
+    session = requests.Session()
+    try:
+        # 获取CSRF令牌
+        session.get(url, headers=headers, timeout=10)
+        csrf_token = session.cookies.get("XSRF-TOKEN", "")
+        if csrf_token:
+            headers["X-CSRF-Token"] = csrf_token
+            print(f"检测到CSRF令牌: {csrf_token[:10]}...")
+        
+        # 执行登录
+        response = session.post(
+            url,
+            data={"username": QB_USER, "password": QB_PASS},
+            headers=headers,
+            timeout=10
+        )
+        
+        print(f"\n登录请求详情:")
+        print(f"- 状态码: {response.status_code}")
+        print(f"- 响应内容: {response.text}")
+        
+        if response.status_code == 200 and response.text == "Ok.":
+            print("登录成功")
+            return session.cookies
+        else:
+            print(f"登录失败: 状态码={response.status_code}, 响应={response.text}")
+            sys.exit(1)
+            
+    except requests.exceptions.RequestException as e:
+        print(f"登录请求异常: {str(e)}")
+        sys.exit(1)
+
+def set_torrent_location(cookies, torrent_hash, save_path):
+    """设置种子保存路径（兼容空响应）"""
+    url = f"http://{QB_HOST}:{QB_PORT}/api/v2/torrents/setLocation"
+    data = {
+        "hashes": torrent_hash,
+        "location": save_path
+    }
+    headers = {
+        "User-Agent": "qbit-classifier/1.0",
+        "X-CSRF-Token": cookies.get("XSRF-TOKEN", ""),
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    
+    try:
+        response = requests.post(
+            url,
+            data=data,
+            cookies=cookies,
+            headers=headers,
+            timeout=10
+        )
+        
+        print(f"\n设置路径请求详情:")
+        print(f"- 状态码: {response.status_code}")
+        print(f"- 响应内容: {response.text}")
+        print(f"- 传递的参数: {data}")
+        
+        # 状态码200即视为成功（兼容空响应）
+        if response.status_code == 200:
+            return True
+        else:
+            print(f"API请求失败 (状态码: {response.status_code})")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        print(f"设置路径请求异常: {str(e)}")
+        return False
+
+def set_torrent_category(cookies, torrent_hash, category):
+    """设置种子分类标签（在WebUI中显示）"""
+    url = f"http://{QB_HOST}:{QB_PORT}/api/v2/torrents/setCategory"
+    data = {
+        "hashes": torrent_hash,
+        "category": category  # 分类标签名称，将显示在WebUI中
+    }
+    headers = {
+        "User-Agent": "qbit-classifier/1.0",
+        "X-CSRF-Token": cookies.get("XSRF-TOKEN", ""),
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    
+    try:
+        response = requests.post(
+            url,
+            data=data,
+            cookies=cookies,
+            headers=headers,
+            timeout=10
+        )
+        
+        print(f"\n设置分类请求详情:")
+        print(f"- 状态码: {response.status_code}")
+        print(f"- 响应内容: {response.text}")
+        print(f"- 传递的参数: {data}")
+        
+        # 状态码200即视为成功
+        if response.status_code == 200:
+            return True
+        else:
+            print(f"设置分类API请求失败 (状态码: {response.status_code})")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        print(f"设置分类请求异常: {str(e)}")
+        return False
+
+# ==================== 分类逻辑 ====================
+def classify_torrent(name):
+    name_lower = name.lower()
+    tv_pattern = r's\d{1,2}e\d{1,2}(-e\d{1,2})?'
+    movie_pattern = r'\b(?:19|20)\d{2}\b|\((?:19|20)\d{2}\)'
+    
+    if re.search(tv_pattern, name_lower):
+        return "tv"
+    elif re.search(movie_pattern, name):
+        return "movie"
+    else:
+        return "other"
+
+# ==================== 主程序 ====================
+if __name__ == "__main__":
+    print("===== 开始种子分类处理 =====")
+    
+    if len(sys.argv) < 4:
+        print(f"参数错误: 预期至少4个参数，实际收到{len(sys.argv)-1}个")
+        sys.exit(1)
+    
+    torrent_hash = sys.argv[1]
+    torrent_name = sys.argv[2]
+    default_path = sys.argv[3]
+    
+    print(f"处理种子: {torrent_name}")
+    print(f"种子哈希: {torrent_hash}")
+    print(f"默认路径: {default_path}")
+    
+    # 确定分类和目标路径
+    category = classify_torrent(torrent_name)
+    if category == "movie":
+        target_path = MOVIES_DIR
+        category_label = CATEGORY_MOVIE  # WebUI中显示的分类名称
+    elif category == "tv":
+        target_path = TV_DIR
+        category_label = CATEGORY_TV
+    else:
+        target_path = OTHER_DIR
+        category_label = CATEGORY_OTHER
+    
+    print(f"判断为{category_label}，目标路径: {target_path}")
+    
+    if default_path == target_path:
+        print("种子已在目标目录，无需调整")
+        sys.exit(0)
+    
+    # 执行登录
+    cookies = login_qbittorrent()
+    
+    # 先设置保存路径，再设置分类标签
+    location_success = set_torrent_location(cookies, torrent_hash, target_path)
+    category_success = set_torrent_category(cookies, torrent_hash, category_label)
+    
+    # 检查是否全部成功
+    if location_success and category_success:
+        print("\n===== 种子保存路径和分类标签设置成功 =====")
+        sys.exit(0)
+    else:
+        print("\n===== 种子设置部分失败 =====")
+        sys.exit(1)
+###
+
+#四、qbittorrent内勾选并填入新增 Torrent 时运行脚本
+
+/opt/venv/bin/python3 /scripts/qbit_classifier.py "%I" "%N" "%F" "%L"
+
+#五、测试
+
+#1、进入容器内终端
+
+sudo docker exec -it qbittorrent /bin/sh
+
+#2、检查python是否安装
+
+/opt/venv/bin/python3 --version
+/opt/venv/bin/pip list | grep requests
+
+#3、测试种子
+
+/opt/venv/bin/python3 /scripts/qbit_classifier.py "155a8d1298be4d457f0c3f303fac85560cb647ba" "Test.Movie.2025.1080p" "/媒体库/下载" ""
+
+#4、查看结果
+
+确保目录存在: /媒体库/下载/电影 (权限: 771)
+确保目录存在: /媒体库/下载/电视剧 (权限: 771)
+确保目录存在: /媒体库/下载/其他 (权限: 771)
+===== 开始种子分类处理 =====
+处理种子: Test.Movie.2025.1080p
+种子哈希: 155a8d1298be4d457f0c3f303fac85560cb647ba
+默认路径: /媒体库/下载/
+判断为电影，目标路径: /媒体库/下载/电影
+
+登录请求详情:
+- 状态码: 200
+- 响应内容: Ok.
+登录成功
+
+设置路径请求详情:
+- 状态码: 200
+- 响应内容: 
+- 传递的参数: {'hashes': '155a8d1298be4d457f0c3f303fac85560cb647ba', 'location': '/媒体库/下载/电影'}
+
+设置分类请求详情:
+- 状态码: 200
+- 响应内容: 
+- 传递的参数: {'hashes': '155a8d1298be4d457f0c3f303fac85560cb647ba', 'category': '电影'}
+
+===== 种子保存路径和分类标签设置成功 =====
+
+#六、上传真实种子，到web界面查看是否成功。
