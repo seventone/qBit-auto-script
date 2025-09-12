@@ -1,0 +1,36 @@
+# qBittorrent 服务器配置
+qbittorrent:
+  host: "10.0.0.10"
+  port: 8081
+  username: "admin"
+  password: "9763899"
+
+# 存储路径配置
+paths:
+  base_dir: "/媒体库/下载"
+  movies_dir: "电影"
+  tv_dir: "电视剧"
+  other_dir: "其他"
+
+# 分类标签（将显示在qBittorrent WebUI中）
+categories:
+  movie: "电影"
+  tv: "电视剧"
+  other: "其他"
+
+# 分类规则 - 仅英文模式正则表达式
+# 电视剧规则优先于电影规则
+classification_rules:
+  tv:
+    # 关键修改：加 (?i) 表示不区分大小写，或把 S 改成 s
+    - (?i)\bS\d{1,2}\b              # (?i) 确保匹配 S01、s01 都生效
+    - (?i)\bS\d{1,2}[Ee]\d{1,2}\b   # 匹配 S01E01、s01e01 等
+    - (?i)\bS\d{1,2}-[Ee]\d{1,2}\b  # 匹配 S01-E01、s01-e01 等
+    - (?i)\bS\d{1,2}[_-]?\d{1,2}\b  # 匹配 S01_01、s01-01 等
+    - (?i)\bSeason\s\d{1,2}\b       # 匹配 Season 1、season 1 等
+    - (?i)\bComplete\sSeason\s\d{1,2}\b  # 匹配 Complete Season 1 等
+  movie:
+    - \b(19|20)\d{2}\b          # 保持不变，年份匹配
+    - \((19|20)\d{2}\)\b        # 保持不变
+    - \[(19|20)\d{2}\]\b        # 保持不变
+    - (?i)\bMovie\b             # 加 (?i) 匹配 Movie、movie 等
