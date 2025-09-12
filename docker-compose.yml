@@ -1,0 +1,24 @@
+services:
+  qbittorrent:
+    # 核心修改：指定 Dockerfile 所在目录和文件名
+    build:
+      context: /vol1/1000/Docker/python    # Dockerfile 所在的目录（你的 Python 目录）
+      dockerfile: Dockerfile               # 文件名（就是你创建的 Dockerfile）
+    image: linuxserver/qbittorrent:latest  # 镜像名保持不变，方便识别
+    container_name: qbittorrent
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=Asia/Shanghai
+      - WEBUI_PORT=8081
+      - TORRENTING_PORT=26881
+    volumes:
+      - /vol1/1000/Docker/qbittorrent/config:/config
+      - /vol2/1000/媒体库:/媒体库
+      - /vol1/1000/Docker/qbittorrent/scripts:/scripts  # 新增：挂载脚本目录到容器内的/scripts
+    ports:
+      - 8081:8080
+      - 26881:26881
+      - 26881:26881/udp
+    restart: unless-stopped
+    network_mode: "host"
