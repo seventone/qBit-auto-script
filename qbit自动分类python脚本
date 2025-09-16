@@ -63,17 +63,17 @@ qbittorrent:
 paths:
   base_dir: "/媒体库/下载"
   movies_dir: "电影"
-  tv_dir: "电视剧"
+  tv_dir: "剧集"
   other_dir: "其他"
 
 # 分类标签（将显示在qBittorrent WebUI中）
 categories:
   movie: "电影"
-  tv: "电视剧"
+  tv: "剧集"
   other: "其他"
 
 # 分类规则 - 仅英文模式正则表达式
-# 电视剧规则优先于电影规则
+# 剧集规则优先于电影规则
 classification_rules:
   tv:
     # 关键修改：加 (?i) 表示不区分大小写，或把 S 改成 s
@@ -244,10 +244,10 @@ def classify_torrent(name, config):
     name_lower = name.lower()
     rules = config['classification_rules']
     
-    # 优先检查电视剧规则
+    # 优先检查剧集规则
     for pattern in rules['tv']:
         if re.search(pattern, name_lower):
-            logger.debug(f"匹配电视剧模式: {pattern} 在 {name} 中")
+            logger.debug(f"匹配剧集模式: {pattern} 在 {name} 中")
             return "tv"
     
     # 然后检查电影规则
@@ -367,9 +367,9 @@ T" "/媒体库/下载"
 2025-09-12 23:51:10,461 - qbit_classifier - INFO - ===== 种子分类处理开始 =====
 2025-09-12 23:51:10,462 - qbit_classifier - INFO - 处理种子: Love.is.for.the.Dogs.2025.S01.1080p.VIKI.WEB-DL.AAC2.0.H.264-DUSKLiGHT (哈希: f67743b4...)
 2025-09-12 23:51:10,462 - qbit_classifier - INFO - 当前路径: /媒体库/下载
-2025-09-12 23:51:10,522 - qbit_classifier - INFO - 分类结果: 电视剧, 目标路径: /媒体库/下载/电视剧
+2025-09-12 23:51:10,522 - qbit_classifier - INFO - 分类结果: 剧集, 目标路径: /媒体库/下载/剧集
 2025-09-12 23:51:10,535 - qbit_classifier - INFO - 登录qBittorrent成功
-2025-09-12 23:51:10,545 - qbit_classifier - INFO - 种子成功分类为 [电视剧] 并启用自动管理
+2025-09-12 23:51:10,545 - qbit_classifier - INFO - 种子成功分类为 [剧集] 并启用自动管理
 
 
 
