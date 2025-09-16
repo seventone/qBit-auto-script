@@ -29,11 +29,11 @@ services:
     build:
       context: /vol1/1000/Docker/python   # Dockerfile 所在的目录（你的 Python 目录）
       dockerfile: Dockerfile              # 文件名（就是你创建的 Dockerfile）
-    image: linuxserver/qbittorrent:latest  # 镜像名保持不变，方便识别
+    image: lscr.io/linuxserver/qbittorrent:latest  # 镜像名保持不变，方便识别
     container_name: qbittorrent
     environment:
-      - PUID=0  
-      - PGID=0
+      - PUID=1000  
+      - PGID=1000
       - TZ=Asia/Shanghai
       - WEBUI_PORT=8081
       - TORRENTING_PORT=26882
@@ -46,7 +46,7 @@ services:
       - 26882:26882
       - 26882:26882/udp
     restart: unless-stopped
-    network_mode: "host"
+    #network_mode: "host"
 ###
 
 #三、创建/scripts文件夹，包含config.yaml、qbit_classifier.py。
