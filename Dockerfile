@@ -1,4 +1,4 @@
-FROM linuxserver/qbittorrent:latest
+FROM lscr.io/linuxserver/qbittorrent:latest
 
 # 1. 安装Python3、pip3（系统级）
 RUN apk update && \
